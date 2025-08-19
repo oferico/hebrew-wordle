@@ -677,7 +677,7 @@ function App() {
   }
 
   return (
-    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} min-h-screen relative overflow-hidden flex flex-col`} dir="rtl" style={{minHeight: '100vh', minHeight: '100dvh', paddingBottom: 'calc(env(safe-area-inset-bottom) + 120px)'}}>
+    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} relative flex flex-col`} dir="rtl" style={{height: '100vh', height: '100dvh', paddingBottom: 'env(safe-area-inset-bottom)'}}>
       
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 animate-pulse">
@@ -797,7 +797,7 @@ function App() {
       </div>
 
       {!categoryCompleted && !allCategoriesCompleted && (
-        <div className="space-y-1 mt-2 flex-1 flex flex-col justify-end pb-2">
+        <div className="space-y-1 mt-auto flex-shrink-0 pb-2">
           {hebrewKeyboard.map((row, i) => (
             <div key={i} className="flex justify-center gap-1">
               {row.map(key => {
@@ -807,7 +807,7 @@ function App() {
                   <button 
                     key={key} 
                     onClick={() => handleKeyPress(key)} 
-                    className={`px-2 py-3 ${isActionKey ? 'min-w-[60px]' : 'min-w-[36px]'} h-14 rounded-lg text-lg font-bold transition-all touch-manipulation ${
+                    className={`px-1 py-2 ${isActionKey ? 'min-w-[50px]' : 'min-w-[32px]'} h-12 rounded-lg text-base font-bold transition-all touch-manipulation ${
                       isActionKey 
                         ? `${darkMode ? 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500' : 'bg-slate-600 hover:bg-slate-700 active:bg-slate-800'} text-white ${
                             key === '↵' && (currentGuess.length !== wordLength || isDuplicateGuess)
