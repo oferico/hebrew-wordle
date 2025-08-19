@@ -219,6 +219,8 @@ function App() {
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [categoryCompleted, setCategoryCompleted] = useState(false);
+  const [allCategoriesCompleted, setAllCategoriesCompleted] = useState(false);
+  const [dailyWordsUsed, setDailyWordsUsed] = useState([]);
   const [easyMode, setEasyMode] = useState(false);
   const [showWinAnimation, setShowWinAnimation] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -228,6 +230,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHints, setShowHints] = useState(false);
   const [enabledCatalogs, setEnabledCatalogs] = useState(['main']);
+  const [darkMode, setDarkMode] = useState(false);
 
   const maxGuesses = 6;
   const wordLength = targetWord.length;
@@ -243,6 +246,7 @@ function App() {
     const savedProgress = localStorage.getItem('hebrew-wordle-progress');
     const savedSolved = localStorage.getItem('hebrew-wordle-solved');
     const savedEasyMode = localStorage.getItem('hebrew-wordle-easy-mode');
+    const savedDarkMode = localStorage.getItem('hebrew-wordle-dark-mode');
     
     if (savedProgress) {
       setUsedWords(JSON.parse(savedProgress));
@@ -274,6 +278,10 @@ function App() {
     
     if (savedEasyMode) {
       setEasyMode(JSON.parse(savedEasyMode));
+    }
+    
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode));
     }
     
     setInitialized(true);
@@ -313,6 +321,13 @@ function App() {
     }
   }, [easyMode, initialized]);
 
+  // Save dark mode preference
+  useEffect(() => {
+    if (initialized) {
+      localStorage.setItem('hebrew-wordle-dark-mode', JSON.stringify(darkMode));
+    }
+  }, [darkMode, initialized]);
+
   // Initialize game when catalog changes
   useEffect(() => {
     if (initialized) {
@@ -337,9 +352,22 @@ function App() {
   };
 
   const getAvailableDailyWords = () => {
-    const usedKey = `${currentCatalog}_daily`;
-    const used = usedWords[usedKey] || [];
-    return dailyWords.filter(word => !used.includes(word));
+    return dailyWords.filter(word => !dailyWordsUsed.includes(word));
+  };
+
+  const getNextAvailableTheme = () => {
+    const themeKeys = Object.keys(themes);
+    for (const theme of themeKeys) {
+      const available = getAvailableWords(theme);
+      if (available.length > 0) {
+        return theme;
+      }
+    }
+    return null;
+  };
+
+  const areAllCategoriesComplete = () => {
+    return Object.keys(themes).every(theme => getAvailableWords(theme).length === 0);
   };
 
   const startNewGameForTheme = (themeToUse = currentTheme) => {
@@ -348,7 +376,46 @@ function App() {
     const availableWords = getAvailableWords(themeToUse);
     
     if (availableWords.length === 0) {
-      setCategoryCompleted(true);
+      // If no words available in this theme, try to find next available theme
+      const nextTheme = getNextAvailableTheme();
+      if (nextTheme) {
+        setCurrentTheme(nextTheme);
+        const nextAvailableWords = getAvailableWords(nextTheme);
+        if (nextAvailableWords.length > 0) {
+          const selectedWord = nextAvailableWords[Math.floor(Math.random() * nextAvailableWords.length)];
+          setTargetWord(selectedWord);
+          setIsDailyWord(false);
+          setGuesses([]);
+          setCurrentGuess('');
+          setGameWon(false);
+          setGameLost(false);
+          setShowHintDialog(false);
+          setCategoryCompleted(false);
+          setAllCategoriesCompleted(false);
+          setShowWinAnimation(false);
+          return;
+        }
+      }
+      
+      // If no themes have available words, try daily words
+      const availableDaily = getAvailableDailyWords();
+      if (availableDaily.length > 0) {
+        const selectedWord = availableDaily[Math.floor(Math.random() * availableDaily.length)];
+        setTargetWord(selectedWord);
+        setIsDailyWord(true);
+        setGuesses([]);
+        setCurrentGuess('');
+        setGameWon(false);
+        setGameLost(false);
+        setShowHintDialog(false);
+        setCategoryCompleted(false);
+        setAllCategoriesCompleted(false);
+        setShowWinAnimation(false);
+        return;
+      }
+      
+      // If absolutely no words available anywhere, show all categories completed
+      setAllCategoriesCompleted(true);
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 3000);
       return;
@@ -364,12 +431,14 @@ function App() {
     setGameLost(false);
     setShowHintDialog(false);
     setCategoryCompleted(false);
+    setAllCategoriesCompleted(false);
     setShowWinAnimation(false);
   };
 
   const startNewGame = () => {
     if (!initialized) return;
 
+    // Check if we should show a daily word (after completing a category word or when starting)
     const shouldShowDaily = !isDailyWord && wordsCompleted > 0;
     
     let selectedWord = '';
@@ -378,19 +447,39 @@ function App() {
     if (shouldShowDaily) {
       const availableDaily = getAvailableDailyWords();
       if (availableDaily.length > 0) {
-        selectedWord = availableDaily[Math.floor(Math.random() * availableDaily.length)];
+        // Pick a random daily word, but avoid the last one if we're cycling
+        let candidateWords = availableDaily;
+        if (dailyWordsUsed.length === dailyWords.length && availableDaily.length > 1) {
+          // We've used all daily words, exclude the last one used to avoid repetition
+          const lastUsed = dailyWordsUsed[dailyWordsUsed.length - 1];
+          candidateWords = availableDaily.filter(word => word !== lastUsed);
+        }
+        selectedWord = candidateWords[Math.floor(Math.random() * candidateWords.length)];
         isDaily = true;
       }
     }
 
     if (!selectedWord) {
-      const availableWords = getAvailableWords(currentTheme);
+      // Try current theme first
+      let availableWords = getAvailableWords(currentTheme);
+      let themeToUse = currentTheme;
+      
+      // If current theme is complete, find next available theme
       if (availableWords.length === 0) {
-        setCategoryCompleted(true);
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 3000);
-        return;
+        const nextTheme = getNextAvailableTheme();
+        if (nextTheme) {
+          themeToUse = nextTheme;
+          setCurrentTheme(nextTheme);
+          availableWords = getAvailableWords(nextTheme);
+        } else {
+          // All categories are complete
+          setAllCategoriesCompleted(true);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 3000);
+          return;
+        }
       }
+      
       selectedWord = availableWords[Math.floor(Math.random() * availableWords.length)];
       isDaily = false;
     }
@@ -403,21 +492,39 @@ function App() {
     setGameLost(false);
     setShowHintDialog(false);
     setCategoryCompleted(false);
+    setAllCategoriesCompleted(false);
     setShowWinAnimation(false);
   };
 
   const markWordAsUsed = (word, isDaily) => {
-    setUsedWords(prev => {
-      const key = isDaily ? `${currentCatalog}_daily` : `${currentCatalog}_${currentTheme}`;
-      const updated = {
-        ...prev,
-        [key]: [...(prev[key] || []), word]
-      };
-      return updated;
-    });
-    
-    if (!isDaily) {
+    if (isDaily) {
+      setDailyWordsUsed(prev => {
+        const updated = [...prev, word];
+        // If we've used all daily words, reset the list but keep the last word to avoid immediate repetition
+        if (updated.length >= dailyWords.length) {
+          return [word];
+        }
+        return updated;
+      });
+    } else {
+      setUsedWords(prev => {
+        const key = `${currentCatalog}_${currentTheme}`;
+        const updated = {
+          ...prev,
+          [key]: [...(prev[key] || []), word]
+        };
+        return updated;
+      });
       setWordsCompleted(prev => prev + 1);
+      
+      // Check if current category is now complete (only after the word is actually used in a game)
+      const currentUsed = usedWords[`${currentCatalog}_${currentTheme}`] || [];
+      const allWordsInCategory = themes[currentTheme]?.words || [];
+      if (currentUsed.length + 1 >= allWordsInCategory.length) {
+        setCategoryCompleted(true);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+      }
     }
   };
 
@@ -442,10 +549,18 @@ function App() {
       resetUsed[`${catalogKey}_daily`] = [];
     });
     setUsedWords(resetUsed);
+    setSolvedWords({});
+    setDailyWordsUsed([]);
     setWordsCompleted(0);
     setCategoryCompleted(false);
+    setAllCategoriesCompleted(false);
     localStorage.removeItem('hebrew-wordle-progress');
-    startNewGameForTheme();
+    localStorage.removeItem('hebrew-wordle-solved');
+    
+    // Reset to first theme
+    const firstTheme = Object.keys(themes)[0];
+    setCurrentTheme(firstTheme);
+    startNewGameForTheme(firstTheme);
   };
 
   const getHint = () => {
@@ -534,17 +649,17 @@ function App() {
   // Don't render until initialized
   if (!initialized) {
     return (
-      <div className="max-w-md mx-auto p-2 bg-gradient-to-b from-slate-50 to-slate-100 h-screen flex items-center justify-center" dir="rtl">
+      <div className={`max-w-md mx-auto p-2 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} h-screen flex items-center justify-center`} dir="rtl">
         <div className="text-center">
           <div className="text-2xl mb-2">🎮</div>
-          <p>טוען...</p>
+          <p className={darkMode ? 'text-white' : 'text-gray-800'}>טוען...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-1 sm:p-2 bg-gradient-to-b from-slate-50 to-slate-100 h-screen relative overflow-auto flex flex-col" dir="rtl">
+    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} min-h-screen relative overflow-auto flex flex-col`} dir="rtl" style={{minHeight: '100vh', minHeight: '100dvh'}}>
       
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 animate-pulse">
@@ -557,22 +672,22 @@ function App() {
 
       <div className="flex justify-between items-center mb-2 px-1 sm:px-2">
         <div className="flex gap-1 sm:gap-2">
-          <button onClick={() => setShowHelp(true)} className="p-1.5 sm:p-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors">
+          <button onClick={() => setShowHelp(true)} className={`p-1.5 sm:p-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors`}>
             <HelpCircle size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
         
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">וורדעלישס</h1>
+        <h1 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>וורדעלישס</h1>
         
-        <button onClick={() => setShowSettings(true)} className="p-1.5 sm:p-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors">
+        <button onClick={() => setShowSettings(true)} className={`p-1.5 sm:p-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors`}>
           <Settings size={18} className="sm:w-5 sm:h-5" />
         </button>
       </div>
 
       {debugMode && (
-        <div className="mb-2 p-2 bg-yellow-100 border border-yellow-300 rounded text-center">
-          <p className="text-xs text-yellow-800 mb-1">🧪 מצב פיתוח (Cmd/Ctrl+D להסתרה)</p>
-          <div className="text-xs mb-1 text-yellow-700">מילה: {targetWord} | {activeContent.name}</div>
+        <div className={`mb-2 p-2 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-100 border-yellow-300'} border rounded text-center`}>
+          <p className={`text-xs ${darkMode ? 'text-yellow-200' : 'text-yellow-800'} mb-1`}>🧪 מצב פיתוח (Cmd/Ctrl+D להסתרה)</p>
+          <div className={`text-xs mb-1 ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>מילה: {targetWord} | {activeContent.name}</div>
           <div className="flex gap-1 justify-center flex-wrap mb-1">
             <button onClick={() => {setGameWon(true); setShowWinAnimation(true);}} className="px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">ניצחון</button>
             <button onClick={() => setGameLost(true)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold">הפסד</button>
@@ -580,25 +695,25 @@ function App() {
             <button onClick={() => {setGameWon(false); setGameLost(false); setShowWinAnimation(false); setGuesses([]); setCurrentGuess('');}} className="px-2 py-1 bg-gray-500 text-white rounded text-xs font-bold">איפוס</button>
           </div>
           <div className="flex gap-1 justify-center">
-            <button onClick={() => setCurrentCatalog('main')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'main' ? 'bg-blue-500 text-white' : 'bg-gray-300'}`}>עיקרי</button>
-            <button onClick={() => setCurrentCatalog('trash')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'trash' ? 'bg-purple-500 text-white' : 'bg-gray-300'}`}>טראש</button>
+            <button onClick={() => setCurrentCatalog('main')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'main' ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-300'}`}>עיקרי</button>
+            <button onClick={() => setCurrentCatalog('trash')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'trash' ? 'bg-purple-500 text-white' : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-300'}`}>טראש</button>
           </div>
         </div>
       )}
 
-      <div className="mb-2 p-2 bg-white rounded-lg shadow-sm border h-12 sm:h-14 flex items-center">
+      <div className={`mb-2 p-2 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'} rounded-lg shadow-sm border h-12 sm:h-14 flex items-center`}>
         <div className="w-full h-10 flex items-center">
           {isDailyWord ? (
-            <div className="w-full h-full bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded flex items-center justify-center">
-              <Star className="inline-block ml-1 text-amber-500" size={14} />
-              <span className="text-amber-800 font-medium text-xs sm:text-sm">מילה יומיומית לתרגול</span>
+            <div className={`w-full h-full ${darkMode ? 'bg-gradient-to-r from-amber-900 to-yellow-900 border-amber-700' : 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200'} border rounded flex items-center justify-center`}>
+              <Star className={`inline-block ml-1 ${darkMode ? 'text-amber-400' : 'text-amber-500'}`} size={14} />
+              <span className={`${darkMode ? 'text-amber-200' : 'text-amber-800'} font-medium text-xs sm:text-sm`}>מילה יומיומית לתרגול</span>
             </div>
           ) : (
             <div className="w-full h-full flex justify-center items-center">
               <select 
                 value={currentTheme} 
                 onChange={(e) => setCurrentTheme(e.target.value)} 
-                className="text-xs sm:text-sm p-1 h-8 border border-slate-300 rounded bg-white text-right font-medium focus:ring-1 focus:ring-blue-500" 
+                className={`text-xs sm:text-sm p-1 h-8 border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-slate-300 bg-white'} rounded text-right font-medium focus:ring-1 focus:ring-blue-500`}
                 dir="rtl"
               >
                 {Object.keys(themes).map(theme => {
@@ -615,21 +730,21 @@ function App() {
         </div>
       </div>
 
-      <div className="mb-3 relative flex-shrink-0 space-y-[2px] sm:space-y-1">
+      <div className="mb-2 relative flex-shrink-0 space-y-1">
         {Array.from({length: maxGuesses}).map((_, i) => (
-          <div key={i} className="flex justify-center gap-[2px] sm:gap-1" dir="rtl">
+          <div key={i} className="flex justify-center gap-1" dir="rtl">
             {Array.from({length: wordLength}).map((_, j) => {
               const guess = guesses[i] || '';
               const letter = i === guesses.length ? currentGuess[j] || '' : guess[j] || '';
               const status = guesses[i] ? getLetterStatus(letter, j, guess) : '';
               
-              return (
-                <div key={j} className={`w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 border-2 flex items-center justify-center text-base sm:text-lg md:text-xl font-bold rounded transition-all duration-300 ${
-                  status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
-                  status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
-                  status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
-                  status === 'incorrect' ? 'bg-slate-400 text-white border-slate-400' :
-                  'bg-white border-slate-300'}`}>
+                return (
+                  <div key={j} className={`w-12 h-12 sm:w-14 sm:h-14 border-2 flex items-center justify-center text-lg sm:text-xl font-bold rounded transition-all duration-300 ${
+                    status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
+                    status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
+                    status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
+                    status === 'incorrect' ? 'bg-slate-400 text-white border-slate-400' :
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-slate-300'}`}>
                   {letter}
                 </div>
               );
@@ -639,20 +754,34 @@ function App() {
 
         {categoryCompleted && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg z-30">
-            <div className="bg-white p-6 rounded-lg text-center shadow-xl border-4 border-purple-500 max-w-xs">
+            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-lg text-center shadow-xl border-4 border-purple-500 max-w-xs`}>
               <Trophy className="mx-auto mb-3 text-purple-600" size={48} />
-              <p className="text-purple-800 font-bold text-lg mb-2">מדהים!</p>
-              <p className="text-purple-600 text-sm mb-4">סיימת את כל המילים בקטגוריה!</p>
-              <button onClick={() => setCategoryCompleted(false)} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-sm transition-colors">סגור</button>
+              <p className={`${darkMode ? 'text-purple-300' : 'text-purple-800'} font-bold text-lg mb-2`}>מדהים!</p>
+              <p className={`${darkMode ? 'text-purple-400' : 'text-purple-600'} text-sm mb-4`}>סיימת את כל המילים בקטגוריה {themes[currentTheme]?.icon}!</p>
+              <button onClick={() => {setCategoryCompleted(false); setTimeout(() => startNewGame(), 100);}} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-sm transition-colors">המשך</button>
+            </div>
+          </div>
+        )}
+
+        {allCategoriesCompleted && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg z-30">
+            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-lg text-center shadow-xl border-4 border-gold-500 max-w-xs`}>
+              <div className="text-6xl mb-3">🏆</div>
+              <p className={`${darkMode ? 'text-yellow-300' : 'text-yellow-600'} font-bold text-xl mb-2`}>כל הכבוד!</p>
+              <p className={`${darkMode ? 'text-yellow-400' : 'text-yellow-700'} text-sm mb-4`}>סיימת את כל המילים בכל הקטגוריות!</p>
+              <div className="space-y-2">
+                <button onClick={() => {resetProgress(); setAllCategoriesCompleted(false);}} className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-sm transition-colors">התחל מחדש</button>
+                <button onClick={() => setAllCategoriesCompleted(false)} className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-bold text-sm transition-colors">סגור</button>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {!categoryCompleted && (
-        <div className="space-y-[2px] sm:space-y-1 mt-3">
+      {!categoryCompleted && !allCategoriesCompleted && (
+        <div className="space-y-1 mt-2 flex-1 flex flex-col justify-end pb-2">
           {hebrewKeyboard.map((row, i) => (
-            <div key={i} className="flex justify-center gap-[2px] sm:gap-1">
+            <div key={i} className="flex justify-center gap-1">
               {row.map(key => {
                 const keyStatus = getKeyboardLetterStatus(key);
                 const isActionKey = key === '⌫' || key === '↵';
@@ -660,19 +789,21 @@ function App() {
                   <button 
                     key={key} 
                     onClick={() => handleKeyPress(key)} 
-                    className={`px-[6px] sm:px-2 py-2.5 sm:py-3 ${isActionKey ? 'min-w-[40px] sm:min-w-[50px]' : 'min-w-[30px] sm:min-w-[36px]'} rounded text-sm sm:text-base font-bold transition-all ${
+                    className={`px-2 py-3 ${isActionKey ? 'min-w-[50px]' : 'min-w-[32px]'} h-12 rounded-lg text-base font-bold transition-all touch-manipulation ${
                       isActionKey 
-                        ? `bg-slate-600 hover:bg-slate-700 text-white ${
+                        ? `${darkMode ? 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500' : 'bg-slate-600 hover:bg-slate-700 active:bg-slate-800'} text-white ${
                             key === '↵' && (currentGuess.length !== wordLength || isDuplicateGuess)
                               ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                           }`
                         : keyStatus === 'correct' || keyStatus === 'correct-position'
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-green-500 hover:bg-green-600 active:bg-green-700 text-white'
                         : keyStatus === 'correct-letter'
-                        ? 'bg-yellow-400 text-white'
+                        ? 'bg-yellow-400 hover:bg-yellow-500 active:bg-yellow-600 text-white'
                         : keyStatus === 'incorrect'
-                        ? 'bg-slate-400 text-white'
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                        ? 'bg-slate-400 hover:bg-slate-500 active:bg-slate-600 text-white'
+                        : darkMode 
+                        ? 'bg-gray-600 hover:bg-gray-500 active:bg-gray-400 text-white'
+                        : 'bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-800'
                     } cursor-pointer`}
                     disabled={key === '↵' && (currentGuess.length !== wordLength || isDuplicateGuess)}
                   >
@@ -688,14 +819,14 @@ function App() {
       {/* Hint Dialog */}
       {showHintDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-slate-800">רמז</h2>
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>רמז</h2>
               <button onClick={() => setShowHintDialog(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-3">💡</div>
-              <p className="text-slate-700 text-lg">{getHint()}</p>
+              <p className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} text-lg`}>{getHint()}</p>
             </div>
             <div className="mt-6 text-center">
               <button onClick={() => setShowHintDialog(false)} className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-bold transition-colors">הבנתי!</button>
@@ -707,15 +838,15 @@ function App() {
       {/* Help Dialog */}
       {showHelp && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 max-h-[85vh] overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 max-h-[85vh] overflow-y-auto`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800">איך משחקים?</h2>
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>איך משחקים?</h2>
               <button onClick={() => setShowHelp(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
-            <div className="text-right space-y-3 text-sm text-slate-700">
+            <div className={`text-right space-y-3 text-sm ${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>
               <p><strong>המטרה:</strong> לנחש את המילה העברית בתוך 6 ניסיונות.</p>
               <p><strong>איך לשחק:</strong> הקלד מילה באורך הנכון ולחץ "שלח". המשחק יראה לך אילו אותיות נכונות.</p>
-              <div className="border border-slate-200 rounded p-3 bg-slate-50">
+              <div className={`border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-slate-200 bg-slate-50'} rounded p-3`}>
                 <p className="font-medium mb-2">משמעות הצבעים:</p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -746,14 +877,14 @@ function App() {
       {/* Settings Dialog */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800">הגדרות</h2>
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>הגדרות</h2>
               <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-3 border-b">
-                <span className="text-slate-700">מצב קל</span>
+                <span className={`${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>מצב קל</span>
                 <button 
                   onClick={() => setEasyMode(!easyMode)} 
                   className="flex items-center"
@@ -764,12 +895,12 @@ function App() {
                   }
                 </button>
               </div>
-              <div className="text-sm text-slate-600 mb-4">
+              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`}>
                 במצב קל, המקלדת מראה אילו אותיות כבר השתמשת ובאילו צבעים
               </div>
 
               <div className="flex justify-between items-center pb-3 border-b">
-                <span className="text-slate-700">הצגת רמזים</span>
+                <span className={`${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>הצגת רמזים</span>
                 <button 
                   onClick={() => setShowHints(!showHints)} 
                   className="flex items-center"
@@ -780,34 +911,50 @@ function App() {
                   }
                 </button>
               </div>
-              <div className="text-sm text-slate-600 mb-4" style={{ minHeight: '1.5rem' }}>
+              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`} style={{ minHeight: '1.5rem' }}>
                 {showHints ? `רמז למילה הנוכחית: ${getHint()}` : ''}
+              </div>
+
+              <div className="flex justify-between items-center pb-3 border-b">
+                <span className={`${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>מצב כהה</span>
+                <button 
+                  onClick={() => setDarkMode(!darkMode)} 
+                  className="flex items-center"
+                >
+                  {darkMode ? 
+                    <ToggleRight className="text-green-600" size={28} /> : 
+                    <ToggleLeft className="text-gray-400" size={28} />
+                  }
+                </button>
+              </div>
+              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`}>
+                מצב כהה נוח יותר לעיניים בתאורה חלשה
               </div>
               
               <div className="border-t pt-4">
-                <div className="text-slate-700 font-medium mb-3">אוספי תוכן</div>
+                <div className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} font-medium mb-3`}>אוספי תוכן</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-600">בני נוער סטאף</span>
+                    <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>בני נוער סטאף</span>
                     <button 
                       onClick={() => setCurrentCatalog('main')} 
                       className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                         currentCatalog === 'main' 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        ? 'bg-blue-500 text-white' 
+                        : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       {currentCatalog === 'main' ? 'פעיל' : 'בחר'}
                     </button>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-600">טראש ישראלי</span>
+                    <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>טראש ישראלי</span>
                     <button 
                       onClick={() => setCurrentCatalog('trash')} 
                       className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                         currentCatalog === 'trash' 
-                          ? 'bg-purple-500 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        ? 'bg-purple-500 text-white' 
+                        : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       {currentCatalog === 'trash' ? 'פעיל' : 'בחר'}
@@ -834,30 +981,30 @@ function App() {
       {/* Game Result Dialog */}
       {(gameWon || gameLost) && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className={`bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 text-center transform transition-all duration-300 scale-100 relative ${gameWon ? 'border-4 border-green-500' : 'border-4 border-red-500'}`}>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 text-center transform transition-all duration-300 scale-100 relative ${gameWon ? 'border-4 border-green-500' : 'border-4 border-red-500'}`}>
             <button onClick={() => {setGameWon(false); setGameLost(false); setShowWinAnimation(false);}} className="absolute top-4 left-4 text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             <div className="text-6xl mb-4">{gameWon ? '🎉' : '😞'}</div>
-            <h2 className={`text-2xl font-bold mb-3 ${gameWon ? 'text-green-800' : 'text-red-800'}`}>
+            <h2 className={`text-2xl font-bold mb-3 ${gameWon ? (darkMode ? 'text-green-400' : 'text-green-800') : (darkMode ? 'text-red-400' : 'text-red-800')}`}>
               {gameWon ? 'כל הכבוד!' : 'לא הצלחת הפעם'}
             </h2>
             <div className="mb-4">
               {gameWon ? (
                 <>
-                  <p className="text-lg mb-2 text-green-700">{getPraiseMessage(guesses.length)}</p>
+                  <p className={`text-lg mb-2 ${darkMode ? 'text-green-400' : 'text-green-700'}`}>{getPraiseMessage(guesses.length)}</p>
                   {!isDailyWord && (
-                    <p className="text-sm text-slate-600 mb-2">
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-2`}>
                       פתרת {solvedInTheme} מתוך {totalInTheme} מילים בקטגוריה {themes[currentTheme]?.icon}
                     </p>
                   )}
-                  {isDailyWord && <p className="text-amber-600 text-sm">תרגלת מילה יומיומית! 📚</p>}
+                  {isDailyWord && <p className={`${darkMode ? 'text-amber-400' : 'text-amber-600'} text-sm`}>תרגלת מילה יומיומית! 📚</p>}
                 </>
               ) : (
                 <>
-                  <p className="text-red-700 text-lg mb-3">המילה הייתה:</p>
-                  <div className="bg-red-100 border-2 border-red-300 rounded-lg p-3 mb-3">
-                    <span className="text-red-800 font-bold text-2xl font-mono">{targetWord}</span>
+                  <p className={`${darkMode ? 'text-red-400' : 'text-red-700'} text-lg mb-3`}>המילה הייתה:</p>
+                  <div className={`${darkMode ? 'bg-red-900 border-red-700' : 'bg-red-100 border-red-300'} border-2 rounded-lg p-3 mb-3`}>
+                    <span className={`${darkMode ? 'text-red-200' : 'text-red-800'} font-bold text-2xl font-mono`}>{targetWord}</span>
                   </div>
-                  <p className="text-red-600 text-sm">נסה שוב במילה הבאה! 💪</p>
+                  <p className={`${darkMode ? 'text-red-400' : 'text-red-600'} text-sm`}>נסה שוב במילה הבאה! 💪</p>
                 </>
               )}
             </div>
