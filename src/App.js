@@ -677,7 +677,7 @@ function App() {
   }
 
   return (
-    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} relative flex flex-col`} dir="rtl" style={{height: '100vh', height: '100dvh', paddingBottom: 'env(safe-area-inset-bottom)'}}>
+    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} relative flex flex-col`} dir="rtl" style={{minHeight: '100vh', minHeight: '100dvh', paddingBottom: 'max(env(safe-area-inset-bottom), 20px)'}}>
       
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 animate-pulse">
@@ -985,7 +985,7 @@ function App() {
               
               <div className="border-t pt-4 mt-4">
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center`}>
-                  גרסה 1.1.2
+                  גרסה 1.1.3
                 </div>
               </div>
             </div>
