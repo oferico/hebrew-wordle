@@ -4,6 +4,8 @@ import { Settings, Trophy, Lightbulb, Star, ToggleLeft, ToggleRight, X, HelpCirc
 // Content catalogs with all themes
 const mainContent = {
   name: 'בני נוער סטאף',
+  id: 'teen-staff',
+  slug: 'teen-staff-x7k9m',
   themes: {
     'אנימה': {
       name: 'אנימה',
@@ -127,6 +129,8 @@ const mainContent = {
 
 const trashContent = {
   name: 'טראש ישראלי',
+  id: 'israeli-trash',
+  slug: 'israeli-trash-p3n8q',
   themes: {
     'ריאליטי': {
       name: 'ריאליטי',
@@ -196,8 +200,22 @@ const trashContent = {
 };
 
 function App() {
+  // URL slug detection
+  const detectCatalogFromURL = () => {
+    const path = window.location.pathname;
+    const slug = path.split('/').pop();
+    
+    // Check if slug matches any catalog
+    if (slug === mainContent.slug) return 'main';
+    if (slug === trashContent.slug) return 'trash';
+    
+    // Default to main if no valid slug found
+    return 'main';
+  };
+
   // Content catalog system
-  const [currentCatalog, setCurrentCatalog] = useState('main');
+  const [currentCatalog, setCurrentCatalog] = useState(detectCatalogFromURL());
+  const [slugMode, setSlugMode] = useState(window.location.pathname.includes('-'));
   const catalogs = {
     main: mainContent,
     trash: trashContent
@@ -659,7 +677,7 @@ function App() {
   }
 
   return (
-    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} min-h-screen relative overflow-auto flex flex-col`} dir="rtl" style={{minHeight: '100vh', minHeight: '100dvh'}}>
+    <div className={`max-w-md mx-auto p-1 ${darkMode ? 'bg-gradient-to-b from-gray-900 to-gray-800' : 'bg-gradient-to-b from-slate-50 to-slate-100'} min-h-screen relative overflow-hidden flex flex-col`} dir="rtl" style={{minHeight: '100vh', minHeight: '100dvh', paddingBottom: 'env(safe-area-inset-bottom)'}}>
       
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 animate-pulse">
@@ -739,7 +757,7 @@ function App() {
               const status = guesses[i] ? getLetterStatus(letter, j, guess) : '';
               
                 return (
-                  <div key={j} className={`w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 border-2 flex items-center justify-center text-xl sm:text-2xl font-bold rounded transition-all duration-300 ${
+                  <div key={j} className={`w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 border-2 flex items-center justify-center text-lg sm:text-xl md:text-2xl font-bold rounded transition-all duration-300 ${
                     status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
                     status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
                     status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
@@ -931,37 +949,39 @@ function App() {
                 מצב כהה נוח יותר לעיניים בתאורה חלשה
               </div>
               
-              <div className="border-t pt-4">
-                <div className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} font-medium mb-3`}>אוספי תוכן</div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>בני נוער סטאף</span>
-                    <button 
-                      onClick={() => setCurrentCatalog('main')} 
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        currentCatalog === 'main' 
-                        ? 'bg-blue-500 text-white' 
-                        : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {currentCatalog === 'main' ? 'פעיל' : 'בחר'}
-                    </button>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>טראש ישראלי</span>
-                    <button 
-                      onClick={() => setCurrentCatalog('trash')} 
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        currentCatalog === 'trash' 
-                        ? 'bg-purple-500 text-white' 
-                        : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {currentCatalog === 'trash' ? 'פעיל' : 'בחר'}
-                    </button>
+              {!slugMode && (
+                <div className="border-t pt-4">
+                  <div className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} font-medium mb-3`}>אוספי תוכן</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>בני נוער סטאף</span>
+                      <button 
+                        onClick={() => setCurrentCatalog('main')} 
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          currentCatalog === 'main' 
+                          ? 'bg-blue-500 text-white' 
+                          : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {currentCatalog === 'main' ? 'פעיל' : 'בחר'}
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>טראש ישראלי</span>
+                      <button 
+                        onClick={() => setCurrentCatalog('trash')} 
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          currentCatalog === 'trash' 
+                          ? 'bg-purple-500 text-white' 
+                          : darkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {currentCatalog === 'trash' ? 'פעיל' : 'בחר'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
               <div className="border-t pt-4 mt-4">
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center`}>
