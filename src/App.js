@@ -237,8 +237,8 @@ function App() {
 
   const hebrewKeyboard = [
     ['ף', 'פ', 'ם', 'ן', 'ו', 'ט', 'א', 'ר', 'ק', '\''],
-    ['⌫', 'ך', 'ל', 'ח', 'י', 'ע', 'כ', 'ג', 'ד', 'ש'],
-    ['↵', 'ץ', 'ת', 'צ', 'מ', 'נ', 'ה', 'ב', 'ס', 'ז']
+    ['↵', 'ך', 'ל', 'ח', 'י', 'ע', 'כ', 'ג', 'ד', 'ש'],
+    ['⌫', 'ץ', 'ת', 'צ', 'מ', 'נ', 'ה', 'ב', 'ס', 'ז']
   ];
 
   // Initialize used words tracking ONCE
@@ -739,7 +739,7 @@ function App() {
               const status = guesses[i] ? getLetterStatus(letter, j, guess) : '';
               
                 return (
-                  <div key={j} className={`w-12 h-12 sm:w-14 sm:h-14 border-2 flex items-center justify-center text-lg sm:text-xl font-bold rounded transition-all duration-300 ${
+                  <div key={j} className={`w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 border-2 flex items-center justify-center text-xl sm:text-2xl font-bold rounded transition-all duration-300 ${
                     status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
                     status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
                     status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
@@ -789,7 +789,7 @@ function App() {
                   <button 
                     key={key} 
                     onClick={() => handleKeyPress(key)} 
-                    className={`px-2 py-3 ${isActionKey ? 'min-w-[50px]' : 'min-w-[32px]'} h-12 rounded-lg text-base font-bold transition-all touch-manipulation ${
+                    className={`px-2 py-3 ${isActionKey ? 'min-w-[60px]' : 'min-w-[36px]'} h-14 rounded-lg text-lg font-bold transition-all touch-manipulation ${
                       isActionKey 
                         ? `${darkMode ? 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500' : 'bg-slate-600 hover:bg-slate-700 active:bg-slate-800'} text-white ${
                             key === '↵' && (currentGuess.length !== wordLength || isDuplicateGuess)
@@ -962,17 +962,12 @@ function App() {
                   </div>
                 </div>
               </div>
-              {/* <button 
-                onClick={() => {
-                  if (window.confirm('האם אתה בטוח? זה ימחק את כל ההתקדמות שלך')) {
-                    resetProgress();
-                    setShowSettings(false);
-                  }
-                }}
-                className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold transition-colors"
-              >
-                איפוס התקדמות
-              </button> */}
+              
+              <div className="border-t pt-4 mt-4">
+                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center`}>
+                  גרסה 1.1.0
+                </div>
+              </div>
             </div>
           </div>
         </div>
