@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/hebrew-wordle/static/css/main.03dc76ac.css",
-    "main.js": "/hebrew-wordle/static/js/main.a5573b0d.js",
+    "main.js": "/hebrew-wordle/static/js/main.1f0748df.js",
     "static/js/488.d60539e1.chunk.js": "/hebrew-wordle/static/js/488.d60539e1.chunk.js",
     "index.html": "/hebrew-wordle/index.html",
     "main.03dc76ac.css.map": "/hebrew-wordle/static/css/main.03dc76ac.css.map",
-    "main.a5573b0d.js.map": "/hebrew-wordle/static/js/main.a5573b0d.js.map",
+    "main.1f0748df.js.map": "/hebrew-wordle/static/js/main.1f0748df.js.map",
     "488.d60539e1.chunk.js.map": "/hebrew-wordle/static/js/488.d60539e1.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.03dc76ac.css",
-    "static/js/main.a5573b0d.js"
+    "static/js/main.1f0748df.js"
   ]
 }
