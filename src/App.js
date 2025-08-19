@@ -797,7 +797,7 @@ function App() {
       </div>
 
       {!categoryCompleted && !allCategoriesCompleted && (
-        <div className="space-y-1 mt-auto flex-shrink-0 pb-2">
+        <div className="space-y-1 mt-auto flex-shrink-0 pb-8 mb-4">
           {hebrewKeyboard.map((row, i) => (
             <div key={i} className="flex justify-center gap-1">
               {row.map(key => {
@@ -985,7 +985,7 @@ function App() {
               
               <div className="border-t pt-4 mt-4">
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center`}>
-                  גרסה 1.1.1
+                  גרסה 1.1.2
                 </div>
               </div>
             </div>
