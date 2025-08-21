@@ -1,227 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Trophy, Lightbulb, Star, ToggleLeft, ToggleRight, X, HelpCircle, Delete, ArrowRight } from 'lucide-react';
+import { Settings, Trophy, Lightbulb, Star, ToggleLeft, ToggleRight, X, HelpCircle, Delete, ArrowRight, RefreshCw, Database } from 'lucide-react';
 
-// Content catalogs with all themes
-const mainContent = {
-  name: 'בני נוער סטאף',
-  id: 'teen-staff',
-  slug: 'teen-staff-x7k9m',
-  themes: {
-    'אנימה': {
-      name: 'אנימה',
-      icon: '🎌',
-      words: ['נארוטו', 'פיקאצו', 'גוקו', 'לופי', 'ססקה', 'דרגון', 'איציגו', 'יוגיו'],
-      hints: {
-        'נארוטו': 'נינג\'ה עם שועל בתוכו',
-        'פיקאצו': 'פוקימון צהוב חמוד',
-        'גוקו': 'לוחם סאיין חזק',
-        'לופי': 'פיראט עם כובע קש',
-        'ססקה': 'נינג\'ה עם שארינגן',
-        'דרגון': 'כדור דרגון',
-        'איציגו': 'שיניגמי תחליף',
-        'יוגיו': 'מלך המשחקים'
+// App version - update this when releasing new versions
+const APP_VERSION = '1.4.1';
+
+// Content catalog file path - update this if the file location changes
+const CONTENT_CATALOG_PATH = '/hebrew-wordle/contentCatalog.json';
+
+// Content catalog loading and validation
+const loadContentCatalog = async () => {
+  try {
+    const response = await fetch(CONTENT_CATALOG_PATH);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Check if response is actually JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Response is not JSON - likely a 404 page');
+    }
+    
+    const catalogData = await response.json();
+    
+    // Validate catalog structure
+    if (!catalogData.catalogs || typeof catalogData.catalogs !== 'object') {
+      throw new Error('Invalid catalog structure: missing catalogs object');
+    }
+    
+    // Validate each catalog
+    for (const [catalogKey, catalog] of Object.entries(catalogData.catalogs)) {
+      if (!catalog.name || !catalog.id || !catalog.themes) {
+        throw new Error(`Invalid catalog structure for ${catalogKey}: missing required fields`);
       }
-    },
-    'קומיקס': {
-      name: 'קומיקס',
-      icon: '🦸',
-      words: ['באטמן', 'ספיידר', 'הלק', 'תור', 'איקס', 'סופרמן', 'וולברין', 'קפטן'],
-      hints: {
-        'באטמן': 'גיבור עטלף מגותאם',
-        'ספיידר': 'גיבור עכביש',
-        'הלק': 'ענק ירוק כועס',
-        'תור': 'אל נורדי עם פטיש',
-        'איקס': 'צוות מוטנטים',
-        'סופרמן': 'איש הפלדה',
-        'וולברין': 'מוטנט עם טפרים',
-        'קפטן': 'מגן אמריקה'
+      
+      // Validate themes
+      for (const [themeKey, theme] of Object.entries(catalog.themes)) {
+        if (!theme.name || !theme.words || !Array.isArray(theme.words) || !theme.hints) {
+          throw new Error(`Invalid theme structure for ${catalogKey}.${themeKey}: missing required fields`);
+        }
       }
-    },
-    'מדע בדיוני': {
-      name: 'מדע בדיוני',
-      icon: '🚀',
-      words: ['רובוט', 'חללית', 'לייזר', 'כוכב', 'זמן', 'גלקסיה', 'חייזר', 'עתיד'],
-      hints: {
-        'רובוט': 'מכונה חכמה',
-        'חללית': 'כלי טיס לחלל',
-        'לייזר': 'קרן אור חזקה',
-        'כוכב': 'גוף שמימי בוהק',
-        'זמן': 'מימד רביעי',
-        'גלקסיה': 'אוסף כוכבים',
-        'חייזר': 'יצור מחלל',
-        'עתיד': 'זמן שעוד לא הגיע'
-      }
-    },
-    'משחקי תפקידים': {
-      name: 'משחקי תפקידים',
-      icon: '⚔️',
-      words: ['דרקון', 'חרב', 'קוסם', 'לוחם', 'שריון', 'מגיה', 'כשף', 'אלף'],
-      hints: {
-        'דרקון': 'יצור אגדי עם כנפיים',
-        'חרב': 'נשק חד',
-        'קוסם': 'משתמש בקסמים',
-        'לוחם': 'איש מלחמה',
-        'שריון': 'הגנה על הגוף',
-        'מגיה': 'כוח קסום',
-        'כשף': 'לחש קסום',
-        'אלף': 'יחידת אלפים'
-      }
-    },
-    'ג\'אנק פוד': {
-      name: 'ג\'אנק פוד',
-      icon: '🍕',
-      words: ['פיצה', 'המבור', 'נאגטס', 'ציפס', 'קוקה', 'שוקו', 'עוגה', 'גלידה'],
-      hints: {
-        'פיצה': 'מאכל איטלקי עגול',
-        'המבור': 'כריך עם בשר',
-        'נאגטס': 'חתיכות עוף מטוגנות',
-        'ציפס': 'תפוחי אדמה מטוגנים',
-        'קוקה': 'משקה מוגז מתוק',
-        'שוקו': 'משקה חם מתוק',
-        'עוגה': 'קינוח מתוק',
-        'גלידה': 'קינוח קר ומתוק'
+      
+      // Validate daily words
+      if (!catalog.dailyWords || !Array.isArray(catalog.dailyWords) || !catalog.dailyHints) {
+        throw new Error(`Invalid daily words structure for ${catalogKey}: missing required fields`);
       }
     }
-  },
-  dailyWords: [
-    'שלום', 'תודה', 'בבקשה', 'סליחה', 'איך', 'מה', 'איפה', 'מתי', 'למה',
-    'טוב', 'רע', 'יפה', 'גדול', 'קטן', 'חם', 'קר', 'מהיר', 'איטי',
-    'בית', 'משפחה', 'חברים', 'ילד', 'ילדה', 'אמא', 'אבא', 'מורה',
-    'ספר', 'מחברת', 'עט', 'מחשב', 'טלפון', 'רכב', 'אוטובוס', 'רכבת'
-  ],
-  dailyHints: {
-    'שלום': 'ברכה בפגישה',
-    'תודה': 'ביטוי הכרת טובה',
-    'בבקשה': 'נימוס בבקשה',
-    'סליחה': 'התנצלות',
-    'איך': 'שאלה על דרך',
-    'מה': 'שאלה על דבר',
-    'איפה': 'שאלה על מקום',
-    'מתי': 'שאלה על זמן',
-    'למה': 'שאלה על סיבה',
-    'טוב': 'איכות חיובית',
-    'רע': 'איכות שלילית',
-    'יפה': 'נעים למראה',
-    'גדול': 'גודל מרשים',
-    'קטן': 'גודל מועט',
-    'חם': 'טמפרטורה גבוהה',
-    'קר': 'טמפרטורה נמוכה',
-    'מהיר': 'מהירות גבוהה',
-    'איטי': 'מהירות נמוכה',
-    'בית': 'מקום מגורים',
-    'משפחה': 'קרובים יקרים',
-    'חברים': 'אנשים קרובים',
-    'ילד': 'אדם צעיר',
-    'ילדה': 'אדם צעיר נקבה',
-    'אמא': 'הורה נקבה',
-    'אבא': 'הורה זכר',
-    'מורה': 'מלמד בבית ספר',
-    'ספר': 'כלי לקריאה',
-    'מחברת': 'כלי לכתיבה',
-    'עט': 'כלי כתיבה',
-    'מחשב': 'מכונה חכמה',
-    'טלפון': 'כלי תקשורת',
-    'רכב': 'כלי תחבורה',
-    'אוטובוס': 'תחבורה ציבורית',
-    'רכבת': 'תחבורה על פסים'
+    
+    console.log('Content catalog loaded and validated successfully:', catalogData.version);
+    return catalogData;
+  } catch (error) {
+    console.error('Failed to load content catalog:', error);
+    throw error;
   }
 };
 
-const trashContent = {
-  name: 'טראש ישראלי',
-  id: 'israeli-trash',
-  slug: 'israeli-trash-p3n8q',
-  themes: {
-    'האח הגדול 2025': {
-      name: 'האח הגדול 2025',
-      icon: '🏠',
-      words: ['יובל', 'שני', 'דרור', 'שלקה', 'תרצה', 'מוגרבי', 'איסקוב', 'תהילה'],
-      hints: {
-        'יובל': 'בחור שקיבל מסוק מההורים שלו',
-        'שני': 'בחורה שכל הבית יוצא נגדה עם יובל',
-        'דרור': 'דייר שלא הפסיק לבכות אחרי ההדחה',
-        'שלקה': 'דיירת שנתפסה על חם בחגיגת קפה סודית',
-        'תרצה': 'דיירת שמסמנת טריטוריה אבל ארז מציב קו אדום',
-        'מוגרבי': 'הנחש מספר אחד לפי יוסי',
-        'איסקוב': 'דייר שהפלירטוטים שומרים אותו במרכז',
-        'תהילה': 'דיירת שיכולה להבין את ההורים בעניין המסוק'
-      }
-    },
-    'מוזיקה': {
-      name: 'מוזיקה 2024',
-      icon: '🎤',
-      words: ['עומראדם', 'נועהקירל', 'איתילוי', 'אושרכהן', 'עדןבןזקן', 'יסמין', 'סטטיק', 'אנהזק', 'אודיה', 'עידןעמדי'],
-      hints: {
-        'עומראדם': 'הזמר הכי מצליח בישראל',
-        'נועהקירל': 'כוכבת פופ צעירה',
-        'איתילוי': 'זמר מזרחי עולה',
-        'אושרכהן': 'זמר "מנגן ושר"',
-        'עדןבןזקן': 'זמרת "חיפשתי אותו בנרות"',
-        'יסמין': 'יסמין מועלם - זמרת',
-        'סטטיק': 'סטטיק ובן אל - ראפרים',
-        'אנהזק': 'זמרת פופ ישראלית',
-        'אודיה': 'זמרת "צמוד צמוד"',
-        'עידןעמדי': 'זמר "לאן שלא תלכי"'
-      }
-    },
-    'סלנג': {
-      name: 'סלנג נוער',
-      icon: '💬',
-      words: ['פיקמי', 'גרינות', 'רדפלאג', 'סיצואיישן', 'ליטוב', 'אחושילינג', 'ברמות', 'דפוקיטו', 'פיוריו', 'קרינג'],
-      hints: {
-        'פיקמי': 'בחורה שמתחננת לתשומת לב',
-        'גרינות': 'דגלים ירוקים - סימנים טובים',
-        'רדפלאג': 'דגל אדום - סימן אזהרה',
-        'סיצואיישן': 'מערכת יחסים לא מוגדרת',
-        'ליטוב': 'משהו מגניב וטוב',
-        'אחושילינג': 'אחי + צילינג - רגוע לגמרי',
-        'ברמות': 'ברמות של... - בסגנון של',
-        'דפוקיטו': 'גרסה חמודה של מטורף',
-        'פיוריו': 'FOMO - פחד להחמיץ',
-        'קרינג': 'משהו מביך מאוד'
-      }
-    }
-  },
-  dailyWords: [
-    'טינדר', 'באמבל', 'סטורי', 'ריל', 'טיקטוק', 'ווייב', 'פיד', 'פולואר'
-  ],
-  dailyHints: {
-    'טינדר': 'אפליקציית היכרויות פופולרית',
-    'באמבל': 'אפליקציה שבה נשים פונות ראשונות',
-    'סטורי': 'סיפור באינסטגרם',
-    'ריל': 'סרטון קצר באינסטגרם',
-    'טיקטוק': 'אפליקציית סרטונים קצרים',
-    'ווייב': 'אווירה או תחושה',
-    'פיד': 'עמוד הבית ברשת חברתית',
-    'פולואר': 'עוקב ברשתות חברתיות'
-  }
-};
+// No hardcoded content - always load from external files
 
 function App() {
-  // URL slug detection
-  const detectCatalogFromURL = () => {
-    const path = window.location.pathname;
-    const slug = path.split('/').pop();
-    
-    // Check if slug matches any catalog
-    if (slug === mainContent.slug) return 'main';
-    if (slug === trashContent.slug) return 'trash';
-    
-    // Default to main if no valid slug found
-    return 'main';
-  };
-
-  // Content catalog system
-  const [currentCatalog, setCurrentCatalog] = useState(detectCatalogFromURL());
+  // Content catalog system - always require external files
+  const [currentCatalog, setCurrentCatalog] = useState('main');
   const [slugMode, setSlugMode] = useState(window.location.pathname.includes('-'));
-  const catalogs = {
-    main: mainContent,
-    trash: trashContent
-  };
+  const [loadedCatalogs, setLoadedCatalogs] = useState(null);
   
-  const activeContent = catalogs[currentCatalog];
-  const themes = activeContent.themes;
-  const dailyWords = activeContent.dailyWords;
+  // Only use loaded catalogs - no fallback
+  const catalogs = loadedCatalogs || {};
+  
+  const activeContent = catalogs[currentCatalog] || { themes: {}, dailyWords: [], name: 'Loading...' };
+  const themes = activeContent.themes || {};
+  const dailyWords = activeContent.dailyWords || [];
 
   const [currentTheme, setCurrentTheme] = useState(Object.keys(themes)[0]);
   const [targetWord, setTargetWord] = useState('');
@@ -244,21 +91,117 @@ function App() {
   const [debugMode, setDebugMode] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [showHints, setShowHints] = useState(false);
   const [enabledCatalogs, setEnabledCatalogs] = useState(['main']);
   const [darkMode, setDarkMode] = useState(false);
+  const [gameStats, setGameStats] = useState({
+    gamesPlayed: 0,
+    gamesWon: 0,
+    currentStreak: 0,
+    maxStreak: 0,
+    guessDistribution: [0, 0, 0, 0, 0, 0], // Index 0 = 1 guess, Index 1 = 2 guesses, etc.
+    gamesLost: 0 // Track failed games for X row
+  });
+  const [gameLog, setGameLog] = useState([]);
+  const [showGameLog, setShowGameLog] = useState(false);
+  const [showGameCompleted, setShowGameCompleted] = useState(false);
+  const [contentCatalog, setContentCatalog] = useState(null);
+  const [catalogLoadError, setCatalogLoadError] = useState(null);
+  const [showContentCatalog, setShowContentCatalog] = useState(false);
+  const [selectedWordHint, setSelectedWordHint] = useState(null);
+  const [showWordHintDialog, setShowWordHintDialog] = useState(false);
+  const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
+  const [pendingCategoryCompletion, setPendingCategoryCompletion] = useState(false);
 
   const maxGuesses = 6;
   const wordLength = targetWord.length;
 
+  // Calculate optimal square size based on word length (for words ≤ 8 chars)
+  const getSquareSize = (wordLength) => {
+    if (wordLength <= 4) return 'w-16 h-16 sm:w-20 sm:h-20 text-2xl sm:text-3xl';
+    if (wordLength <= 6) return 'w-14 h-14 sm:w-16 sm:h-16 text-xl sm:text-2xl';
+    if (wordLength <= 8) return 'w-12 h-12 sm:w-14 sm:h-14 text-lg sm:text-xl';
+    // Fallback for invalid long words (should not occur after filtering)
+    return 'w-10 h-10 text-base';
+  };
+
+  // Filter words during catalog loading to prevent words longer than 8 characters
+  const validateAndFilterWords = (words) => {
+    return words.filter(word => {
+      if (word.length > 8) {
+        console.warn(`Word "${word}" is too long (${word.length} chars) and will be excluded`);
+        return false;
+      }
+      return true;
+    });
+  };
+
   const hebrewKeyboard = [
-    ['ף', 'פ', 'ם', 'ן', 'ו', 'ט', 'א', 'ר', 'ק', '\''],
-    ['↵', 'ך', 'ל', 'ח', 'י', 'ע', 'כ', 'ג', 'ד', 'ש'],
-    ['⌫', 'ץ', 'ת', 'צ', 'מ', 'נ', 'ה', 'ב', 'ס', 'ז']
+    ['⌫', 'פ', 'ם', 'ן', 'ו', 'ט', 'א', 'ר', 'ק', '\''],  // Backspace moved to top
+    ['ף', 'ך', 'ל', 'ח', 'י', 'ע', 'כ', 'ג', 'ד', 'ש'],   // ף moved down from top row
+    ['↵', 'ץ', 'ת', 'צ', 'מ', 'נ', 'ה', 'ב', 'ס', 'ז']    // Enter moved down from middle row
   ];
 
-  // Initialize used words tracking ONCE
+  // Logging system
+  const addToGameLog = (event, details = {}) => {
+    const timestamp = new Date().toLocaleString('he-IL');
+    
+    // Get current stats at the time of logging (after any updates)
+    setGameLog(prev => {
+      const logEntry = {
+        timestamp,
+        event,
+        details: {
+          ...details,
+          catalog: activeContent.name,
+          theme: currentTheme,
+          targetWord: targetWord,
+          guesses: guesses.length + 1,
+          gameStats: { ...gameStats }
+        }
+      };
+      return [logEntry, ...prev];
+    });
+  };
+
+  // Generate random wrong word for debug
+  const generateRandomWrongWord = () => {
+    const hebrewLetters = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'];
+    let randomWord = '';
+    for (let i = 0; i < wordLength; i++) {
+      let randomLetter;
+      do {
+        randomLetter = hebrewLetters[Math.floor(Math.random() * hebrewLetters.length)];
+      } while (targetWord[i] === randomLetter); // Ensure it's not the correct letter
+      randomWord += randomLetter;
+    }
+    return randomWord;
+  };
+
+  // Load external content catalog on startup
   useEffect(() => {
+    const loadExternalCatalog = async () => {
+      try {
+        const catalogData = await loadContentCatalog();
+        console.log('External catalog loaded successfully, integrating into game...');
+        
+        
+        setLoadedCatalogs(catalogData.catalogs);
+        addToGameLog('CATALOG_LOADED_ON_STARTUP', { version: catalogData?.version || 'unknown' });
+      } catch (error) {
+        console.log('External catalog not available:', error.message);
+        // Don't set error state on startup - just show loading state
+      }
+    };
+
+    loadExternalCatalog();
+  }, []);
+
+  // Initialize used words tracking ONCE - wait for catalogs to load
+  useEffect(() => {
+    if (!loadedCatalogs) return; // Wait for catalogs to load
+    
     const savedProgress = localStorage.getItem('hebrew-wordle-progress');
     const savedSolved = localStorage.getItem('hebrew-wordle-solved');
     const savedEasyMode = localStorage.getItem('hebrew-wordle-easy-mode');
@@ -270,10 +213,12 @@ function App() {
       const initialUsed = {};
       Object.keys(catalogs).forEach(catalogKey => {
         const catalog = catalogs[catalogKey];
-        Object.keys(catalog.themes).forEach(theme => {
-          initialUsed[`${catalogKey}_${theme}`] = [];
-        });
-        initialUsed[`${catalogKey}_daily`] = [];
+        if (catalog && catalog.themes) {
+          Object.keys(catalog.themes).forEach(theme => {
+            initialUsed[`${catalogKey}_${theme}`] = [];
+          });
+          initialUsed[`${catalogKey}_daily`] = [];
+        }
       });
       setUsedWords(initialUsed);
     }
@@ -284,10 +229,12 @@ function App() {
       const initialSolved = {};
       Object.keys(catalogs).forEach(catalogKey => {
         const catalog = catalogs[catalogKey];
-        Object.keys(catalog.themes).forEach(theme => {
-          initialSolved[`${catalogKey}_${theme}`] = [];
-        });
-        initialSolved[`${catalogKey}_daily`] = [];
+        if (catalog && catalog.themes) {
+          Object.keys(catalog.themes).forEach(theme => {
+            initialSolved[`${catalogKey}_${theme}`] = [];
+          });
+          initialSolved[`${catalogKey}_daily`] = [];
+        }
       });
       setSolvedWords(initialSolved);
     }
@@ -300,8 +247,13 @@ function App() {
       setDarkMode(JSON.parse(savedDarkMode));
     }
     
+    const savedStats = localStorage.getItem('hebrew-wordle-stats');
+    if (savedStats) {
+      setGameStats(JSON.parse(savedStats));
+    }
+    
     setInitialized(true);
-  }, []);
+  }, [loadedCatalogs, catalogs]);
 
   // Debug mode keyboard shortcut
   useEffect(() => {
@@ -343,6 +295,13 @@ function App() {
       localStorage.setItem('hebrew-wordle-dark-mode', JSON.stringify(darkMode));
     }
   }, [darkMode, initialized]);
+
+  // Save game stats
+  useEffect(() => {
+    if (initialized) {
+      localStorage.setItem('hebrew-wordle-stats', JSON.stringify(gameStats));
+    }
+  }, [gameStats, initialized]);
 
   // Initialize game when catalog changes
   useEffect(() => {
@@ -537,9 +496,13 @@ function App() {
       const currentUsed = usedWords[`${currentCatalog}_${currentTheme}`] || [];
       const allWordsInCategory = themes[currentTheme]?.words || [];
       if (currentUsed.length + 1 >= allWordsInCategory.length) {
-        setCategoryCompleted(true);
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 3000);
+        // Category is complete when all words have been played (not necessarily solved)
+        setPendingCategoryCompletion(true);
+        setTimeout(() => {
+          setCategoryCompleted(true);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 3000);
+        }, 100); // Small delay to ensure game result dialog shows first
       }
     }
   };
@@ -552,6 +515,30 @@ function App() {
         [key]: [...(prev[key] || []), word]
       };
       return updated;
+    });
+  };
+
+  const updateGameStats = (won, guessCount, onStatsUpdated) => {
+    setGameStats(prev => {
+      const newStats = {
+        gamesPlayed: prev.gamesPlayed + 1,
+        gamesWon: won ? prev.gamesWon + 1 : prev.gamesWon,
+        currentStreak: won ? prev.currentStreak + 1 : 0,
+        maxStreak: won ? Math.max(prev.maxStreak, prev.currentStreak + 1) : prev.maxStreak,
+        guessDistribution: [...prev.guessDistribution],
+        gamesLost: won ? (prev.gamesLost || 0) : (prev.gamesLost || 0) + 1
+      };
+      
+      if (won && guessCount >= 1 && guessCount <= 6) {
+        newStats.guessDistribution[guessCount - 1]++;
+      }
+      
+      // Call the callback with the new stats
+      if (onStatsUpdated) {
+        setTimeout(() => onStatsUpdated(newStats), 0);
+      }
+      
+      return newStats;
     });
   };
 
@@ -570,8 +557,17 @@ function App() {
     setWordsCompleted(0);
     setCategoryCompleted(false);
     setAllCategoriesCompleted(false);
+    setGameStats({
+      gamesPlayed: 0,
+      gamesWon: 0,
+      currentStreak: 0,
+      maxStreak: 0,
+      guessDistribution: [0, 0, 0, 0, 0, 0],
+      gamesLost: 0
+    });
     localStorage.removeItem('hebrew-wordle-progress');
     localStorage.removeItem('hebrew-wordle-solved');
+    localStorage.removeItem('hebrew-wordle-stats');
     
     // Reset to first theme
     const firstTheme = Object.keys(themes)[0];
@@ -593,6 +589,30 @@ function App() {
     return 'מילה מעניינת!';
   };
 
+  const getWordHint = (word, catalogKey, isDaily = false) => {
+    if (isDaily) {
+      const catalog = catalogs[catalogKey];
+      return catalog?.dailyHints?.[word] || 'מילה שימושית!';
+    }
+    
+    const catalog = catalogs[catalogKey];
+    if (!catalog) return 'מילה מעניינת!';
+    
+    for (const themeKey in catalog.themes) {
+      if (catalog.themes[themeKey].hints && catalog.themes[themeKey].hints[word]) {
+        return catalog.themes[themeKey].hints[word];
+      }
+    }
+    
+    return 'מילה מעניינת!';
+  };
+
+  const handleWordClick = (word, catalogKey, isDaily = false) => {
+    const hint = getWordHint(word, catalogKey, isDaily);
+    setSelectedWordHint({ word, hint });
+    setShowWordHintDialog(true);
+  };
+
   const submitGuess = () => {
     if (currentGuess.length !== wordLength) return;
     if (guesses.includes(currentGuess)) return;
@@ -600,13 +620,65 @@ function App() {
     const newGuesses = [...guesses, currentGuess];
     setGuesses(newGuesses);
 
-    if (currentGuess === targetWord) {
+    // Normalize both words for comparison to handle geresh/apostrophe variations
+    const normalizedGuess = normalizeWord(currentGuess);
+    const normalizedTarget = normalizeWord(targetWord);
+
+    if (normalizedGuess === normalizedTarget) {
       setGameWon(true);
       setShowWinAnimation(true);
       markWordAsUsed(targetWord, isDailyWord);
       markWordAsSolved(targetWord, isDailyWord);
+      updateGameStats(true, newGuesses.length, (updatedStats) => {
+        // Create a custom logging function that uses the updated stats
+        const timestamp = new Date().toLocaleString('he-IL');
+        const logEntry = {
+          timestamp,
+          event: 'WORD_GUESS_SUCCESS',
+          details: {
+            guessedWord: currentGuess, 
+            guessNumber: newGuesses.length,
+            isCorrect: true,
+            catalog: activeContent.name,
+            theme: currentTheme,
+            targetWord: targetWord,
+            guesses: newGuesses.length,
+            gameStats: updatedStats
+          }
+        };
+        setGameLog(prev => [logEntry, ...prev]);
+      });
     } else if (newGuesses.length >= maxGuesses) {
       setGameLost(true);
+      // Mark failed word as used so it doesn't appear again
+      markWordAsUsed(targetWord, isDailyWord);
+      updateGameStats(false, newGuesses.length, (updatedStats) => {
+        // Create a custom logging function that uses the updated stats
+        const timestamp = new Date().toLocaleString('he-IL');
+        const logEntry = {
+          timestamp,
+          event: 'WORD_GUESS_FAILURE',
+          details: {
+            guessedWord: currentGuess, 
+            guessNumber: newGuesses.length,
+            isCorrect: false,
+            gameEnded: true,
+            catalog: activeContent.name,
+            theme: currentTheme,
+            targetWord: targetWord,
+            guesses: newGuesses.length,
+            gameStats: updatedStats
+          }
+        };
+        setGameLog(prev => [logEntry, ...prev]);
+      });
+    } else {
+      addToGameLog('WORD_GUESS_FAILURE', { 
+        guessedWord: currentGuess, 
+        guessNumber: newGuesses.length,
+        isCorrect: false,
+        gameEnded: false 
+      });
     }
 
     setCurrentGuess('');
@@ -633,6 +705,20 @@ function App() {
     return '';
   };
 
+  // Enhanced character normalization function
+  const normalizeGeresh = (key) => {
+    // Handle various representations of geresh/apostrophe
+    if (key === "'" || key === '׳' || key === '\u05F3' || key === '\u0027') {
+      return '׳'; // Hebrew geresh (U+05F3)
+    }
+    return key;
+  };
+
+  // Normalize entire word for comparison
+  const normalizeWord = (word) => {
+    return word.split('').map(char => normalizeGeresh(char)).join('');
+  };
+
   const handleKeyPress = (key) => {
     if (gameWon || gameLost || categoryCompleted) return;
 
@@ -641,11 +727,60 @@ function App() {
     } else if (key === 'שלח' || key === '↵') {
       submitGuess();
     } else if (currentGuess.length < wordLength) {
-      // Handle geresh character - accept both ׳ and '
-      const normalizedKey = key === "'" ? '׳' : key;
+      // Enhanced geresh character handling - accept both ׳ and ' and normalize to ׳
+      const normalizedKey = normalizeGeresh(key);
       setCurrentGuess(prev => prev + normalizedKey);
     }
   };
+
+  // Add desktop keyboard support
+  useEffect(() => {
+    const handlePhysicalKeyDown = (event) => {
+      if (gameWon || gameLost || categoryCompleted) return;
+      
+      // Prevent default behavior for game keys
+      const gameKeys = ['Backspace', 'Enter', 'Delete'];
+      const hebrewKeys = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת', 'ך', 'ם', 'ן', 'ף', 'ץ'];
+      
+      if (gameKeys.includes(event.key) || hebrewKeys.includes(event.key) || event.key === "'" || event.key === '׳') {
+        event.preventDefault();
+      }
+
+      // Handle backspace/delete
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        handleKeyPress('⌫');
+        return;
+      }
+
+      // Handle enter
+      if (event.key === 'Enter') {
+        handleKeyPress('↵');
+        return;
+      }
+
+      // Handle Hebrew characters and apostrophe/geresh
+      if (hebrewKeys.includes(event.key) || event.key === "'" || event.key === '׳') {
+        handleKeyPress(event.key);
+        return;
+      }
+
+      // Handle English to Hebrew mapping for QWERTY users
+      const englishToHebrew = {
+        'q': '/', 'w': '\'', 'e': 'ק', 'r': 'ר', 't': 'א', 'y': 'ט', 'u': 'ו', 'i': 'ן', 'o': 'ם', 'p': 'פ',
+        'a': 'ש', 's': 'ד', 'd': 'ג', 'f': 'כ', 'g': 'ע', 'h': 'י', 'j': 'ח', 'k': 'ל', 'l': 'ך', ';': 'ף',
+        'z': 'ז', 'x': 'ס', 'c': 'ב', 'v': 'ה', 'b': 'נ', 'n': 'מ', 'm': 'צ', ',': 'ת', '.': 'ץ',
+        "'": '׳'
+      };
+
+      const hebrewChar = englishToHebrew[event.key.toLowerCase()];
+      if (hebrewChar) {
+        handleKeyPress(hebrewChar);
+      }
+    };
+
+    window.addEventListener('keydown', handlePhysicalKeyDown);
+    return () => window.removeEventListener('keydown', handlePhysicalKeyDown);
+  }, [gameWon, gameLost, categoryCompleted, currentGuess.length, wordLength]);
 
   const availableInTheme = getAvailableWords(currentTheme).length;
   const totalInTheme = themes[currentTheme]?.words?.length || 0;
@@ -686,18 +821,25 @@ function App() {
       )}
 
 
-      <div className="flex justify-between items-center mb-2 px-1 sm:px-2">
-        <div className="flex gap-1 sm:gap-2">
-          <button onClick={() => setShowHelp(true)} className={`p-1.5 sm:p-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors`}>
-            <HelpCircle size={18} className="sm:w-5 sm:h-5" />
+      <div className="flex items-center mb-3 px-2 sm:px-3">
+        <div className="flex gap-2 sm:gap-3 w-24 justify-start">
+          <button onClick={() => setShowHelp(true)} className={`p-3 sm:p-3 min-w-[44px] min-h-[44px] ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors flex items-center justify-center`}>
+            <HelpCircle size={24} className="sm:w-6 sm:h-6" />
+          </button>
+          <button onClick={() => setShowStats(true)} className={`p-3 sm:p-3 min-w-[44px] min-h-[44px] ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors flex items-center justify-center`}>
+            <Trophy size={24} className="sm:w-6 sm:h-6" />
           </button>
         </div>
         
-        <h1 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>וורדעלישס</h1>
+        <div className="flex-1 flex justify-center">
+          <h1 className={`text-2xl sm:text-3xl md:text-4xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>וורדעלישס</h1>
+        </div>
         
-        <button onClick={() => setShowSettings(true)} className={`p-1.5 sm:p-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors`}>
-          <Settings size={18} className="sm:w-5 sm:h-5" />
-        </button>
+        <div className="flex gap-2 sm:gap-3 w-24 justify-end">
+          <button onClick={() => setShowSettings(true)} className={`p-3 sm:p-3 min-w-[44px] min-h-[44px] ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg transition-colors flex items-center justify-center`}>
+            <Settings size={24} className="sm:w-6 sm:h-6" />
+          </button>
+        </div>
       </div>
 
       {debugMode && (
@@ -705,14 +847,44 @@ function App() {
           <p className={`text-xs ${darkMode ? 'text-yellow-200' : 'text-yellow-800'} mb-1`}>🧪 מצב פיתוח (Cmd/Ctrl+D להסתרה)</p>
           <div className={`text-xs mb-1 ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>מילה: {targetWord} | {activeContent.name}</div>
           <div className="flex gap-1 justify-center flex-wrap mb-1">
-            <button onClick={() => {setGameWon(true); setShowWinAnimation(true);}} className="px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">ניצחון</button>
-            <button onClick={() => setGameLost(true)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold">הפסד</button>
-            <button onClick={() => setCurrentGuess(targetWord)} className="px-2 py-1 bg-blue-500 text-white rounded text-xs font-bold">מילא</button>
-            <button onClick={() => {setGameWon(false); setGameLost(false); setShowWinAnimation(false); setGuesses([]); setCurrentGuess('');}} className="px-2 py-1 bg-gray-500 text-white rounded text-xs font-bold">איפוס</button>
+            <button onClick={() => {
+              addToGameLog('DEBUG_WIN_TRIGGERED', { method: 'debug_button' });
+              setGameWon(true); 
+              setShowWinAnimation(true);
+            }} className="px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">ניצחון</button>
+            <button onClick={() => {
+              addToGameLog('DEBUG_LOSS_TRIGGERED', { method: 'debug_button' });
+              setGameLost(true);
+            }} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold">הפסד</button>
+            <button onClick={() => {
+              addToGameLog('DEBUG_CORRECT_WORD_FILLED', { word: targetWord });
+              setCurrentGuess(targetWord);
+            }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs font-bold">מילה נכונה</button>
+            <button onClick={() => {
+              const wrongWord = generateRandomWrongWord();
+              addToGameLog('DEBUG_WRONG_WORD_FILLED', { word: wrongWord });
+              setCurrentGuess(wrongWord);
+            }} className="px-2 py-1 bg-orange-500 text-white rounded text-xs font-bold">מילה שגויה</button>
           </div>
-          <div className="flex gap-1 justify-center">
+          <div className="flex gap-1 justify-center flex-wrap mb-1">
+            <button onClick={() => {
+              addToGameLog('DEBUG_GAME_RESET', {});
+              setGameWon(false); 
+              setGameLost(false); 
+              setShowWinAnimation(false); 
+              setGuesses([]); 
+              setCurrentGuess('');
+            }} className="px-2 py-1 bg-gray-500 text-white rounded text-xs font-bold">איפוס</button>
+            <button onClick={() => {
+              addToGameLog('DEBUG_GAME_COMPLETED_TRIGGERED', { method: 'debug_button' });
+              setShowGameCompleted(true);
+            }} className="px-2 py-1 bg-purple-500 text-white rounded text-xs font-bold">משחק הושלם</button>
+            <button onClick={() => setShowGameLog(true)} className="px-2 py-1 bg-indigo-500 text-white rounded text-xs font-bold">יומן</button>
+          </div>
+          <div className="flex gap-1 justify-center flex-wrap">
             <button onClick={() => setCurrentCatalog('main')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'main' ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-300'}`}>עיקרי</button>
             <button onClick={() => setCurrentCatalog('trash')} className={`px-2 py-1 rounded text-xs ${currentCatalog === 'trash' ? 'bg-purple-500 text-white' : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-300'}`}>טראש</button>
+            <button onClick={() => setShowContentCatalog(true)} className="px-2 py-1 bg-teal-500 text-white rounded text-xs font-bold">קטלוג תוכן</button>
           </div>
         </div>
       )}
@@ -754,27 +926,27 @@ function App() {
               const letter = i === guesses.length ? currentGuess[j] || '' : guess[j] || '';
               const status = guesses[i] ? getLetterStatus(letter, j, guess) : '';
               
-                return (
-                  <div key={j} className={`w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 border-2 flex items-center justify-center text-lg sm:text-xl md:text-2xl font-bold rounded transition-all duration-300 ${
-                    status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
-                    status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
-                    status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
-                    status === 'incorrect' ? 'bg-slate-400 text-white border-slate-400' :
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-slate-300'}`}>
-                  {letter}
-                </div>
-              );
+              return (
+                <div key={j} className={`${getSquareSize(wordLength)} border-2 flex items-center justify-center font-bold rounded transition-all duration-300 ${
+                  status === 'correct' ? 'bg-green-500 text-white border-green-500 animate-pulse' :
+                  status === 'correct-position' ? 'bg-green-500 text-white border-green-500' :
+                  status === 'correct-letter' ? 'bg-yellow-400 text-white border-yellow-400' :
+                  status === 'incorrect' ? 'bg-slate-400 text-white border-slate-400' :
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-slate-300'}`}>
+                {letter}
+              </div>
+            );
             })}
           </div>
         ))}
 
         {categoryCompleted && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg z-30">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30" style={{top: 0}}>
             <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-lg text-center shadow-xl border-4 border-purple-500 max-w-xs`}>
               <Trophy className="mx-auto mb-3 text-purple-600" size={48} />
               <p className={`${darkMode ? 'text-purple-300' : 'text-purple-800'} font-bold text-lg mb-2`}>מדהים!</p>
               <p className={`${darkMode ? 'text-purple-400' : 'text-purple-600'} text-sm mb-4`}>סיימת את כל המילים בקטגוריה {themes[currentTheme]?.icon}!</p>
-              <button onClick={() => {setCategoryCompleted(false); setTimeout(() => startNewGame(), 100);}} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-sm transition-colors">המשך</button>
+              <button onClick={() => {console.log('DEBUG: Category completed dialog - Continue button clicked'); setCategoryCompleted(false); setTimeout(() => startNewGame(), 100);}} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-sm transition-colors">המשך</button>
             </div>
           </div>
         )}
@@ -890,10 +1062,136 @@ function App() {
         </div>
       )}
 
+      {/* Stats Dialog */}
+      {showStats && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>סטטיסטיקות</h2>
+              <button onClick={() => setShowStats(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+            
+            {/* Main Stats Row - Top 3 */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
+                  {gameStats.gamesPlayed}
+                </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  משחקים
+                </div>
+              </div>
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
+                  {gameStats.gamesWon}
+                </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  ניצחונות
+                </div>
+              </div>
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
+                  {gameStats.gamesPlayed > 0 ? Math.round((gameStats.gamesWon / gameStats.gamesPlayed) * 100) : 0}
+                </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  % הצלחה
+                </div>
+              </div>
+            </div>
+
+            {/* Secondary Stats Row - Bottom 2 */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
+                  {gameStats.currentStreak}
+                </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  סטרייק נוכחי
+                </div>
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
+                  {gameStats.maxStreak}
+                </div>
+                <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  סטרייק מקס׳
+                </div>
+              </div>
+            </div>
+
+            {/* Guess Distribution */}
+            <div className="mb-6">
+              <h3 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-black'} mb-3 text-center`}>
+                התפלגות ניחושים
+              </h3>
+              <div className="space-y-1">
+                {gameStats.guessDistribution.map((count, index) => {
+                  const maxCount = Math.max(...gameStats.guessDistribution, gameStats.gamesLost || 0);
+                  const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                  const isCurrentGuess = gameWon && guesses.length === index + 1;
+                  
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className={`text-sm font-bold w-4 ${darkMode ? 'text-white' : 'text-black'}`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 relative">
+                        <div 
+                          className={`h-5 rounded text-white text-xs flex items-center justify-end px-2 font-bold transition-all duration-300 ${
+                            isCurrentGuess 
+                              ? 'bg-green-500' 
+                              : darkMode ? 'bg-gray-600' : 'bg-gray-400'
+                          }`}
+                          style={{ 
+                            width: count > 0 ? `${Math.max(percentage, 8)}%` : '8%',
+                            minWidth: '20px'
+                          }}
+                        >
+                          {count}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* X row for failed games */}
+                <div className="flex items-center gap-2">
+                  <div className={`text-sm font-bold w-4 ${darkMode ? 'text-white' : 'text-black'}`}>
+                    X
+                  </div>
+                  <div className="flex-1 relative">
+                    <div 
+                      className={`h-5 rounded text-white text-xs flex items-center justify-end px-2 font-bold transition-all duration-300 ${
+                        gameLost && !gameWon
+                          ? 'bg-red-500' 
+                          : darkMode ? 'bg-gray-600' : 'bg-gray-400'
+                      }`}
+                      style={{ 
+                        width: (gameStats.gamesLost || 0) > 0 ? `${Math.max((gameStats.gamesLost || 0) / Math.max(...gameStats.guessDistribution, gameStats.gamesLost || 0) * 100, 8)}%` : '8%',
+                        minWidth: '20px'
+                      }}
+                    >
+                      {gameStats.gamesLost || 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowResetConfirmDialog(true)}
+              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors"
+            >
+              מחק הישגים
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Settings Dialog */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 max-h-[90vh] overflow-y-auto`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>הגדרות</h2>
               <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
@@ -911,7 +1209,7 @@ function App() {
                   }
                 </button>
               </div>
-              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`}>
+              <div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-400'} mb-4`}>
                 במצב קל, המקלדת מראה אילו אותיות כבר השתמשת ובאילו צבעים
               </div>
 
@@ -927,7 +1225,7 @@ function App() {
                   }
                 </button>
               </div>
-              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`} style={{ minHeight: '1.5rem' }}>
+              <div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-400'} mb-4`} style={{ minHeight: '1.5rem' }}>
                 {showHints ? `רמז למילה הנוכחית: ${getHint()}` : ''}
               </div>
 
@@ -943,7 +1241,7 @@ function App() {
                   }
                 </button>
               </div>
-              <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-slate-600'} mb-4`}>
+              <div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-400'} mb-4`}>
                 מצב כהה נוח יותר לעיניים בתאורה חלשה
               </div>
               
@@ -981,9 +1279,9 @@ function App() {
                 </div>
               )}
               
-              <div className="border-t pt-4 mt-4">
+                  <div className="border-t pt-4 mt-4">
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center`}>
-                  גרסה 1.2.0
+                  גרסה {APP_VERSION}
                 </div>
               </div>
             </div>
@@ -1022,7 +1320,353 @@ function App() {
               )}
             </div>
             <div className="flex justify-center">
-              <button onClick={() => {setGameWon(false); setGameLost(false); setShowWinAnimation(false); setTimeout(() => startNewGame(), 100);}} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors">המילה הבאה</button>
+              <button onClick={() => {
+                setGameWon(false); 
+                setGameLost(false); 
+                setShowWinAnimation(false); 
+                // Check if category completion is pending
+                if (pendingCategoryCompletion) {
+                  // Don't start new game yet, let category completion dialog show first
+                  setPendingCategoryCompletion(false);
+                } else {
+                  // No pending category completion, start new game normally
+                  setTimeout(() => startNewGame(), 100);
+                }
+              }} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors">המילה הבאה</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Log Dialog */}
+      {showGameLog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-lg w-full mx-4 p-6 max-h-[80vh] overflow-hidden flex flex-col`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>יומן משחק</h2>
+              <button onClick={() => setShowGameLog(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {gameLog.length === 0 ? (
+                <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>אין אירועים ביומן</p>
+              ) : (
+                <div className="space-y-3">
+                  {gameLog.map((entry, index) => (
+                    <div key={index} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <span className={`text-sm font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                          {entry.event}
+                        </span>
+                        <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {entry.timestamp}
+                        </span>
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <div><strong>קטלוג:</strong> {entry.details.catalog}</div>
+                        <div><strong>נושא:</strong> {entry.details.theme}</div>
+                        <div><strong>מילה:</strong> {entry.details.targetWord}</div>
+                        <div><strong>ניחושים:</strong> {entry.details.guesses}</div>
+                        {entry.details.word && <div><strong>מילה:</strong> {entry.details.word}</div>}
+                        {entry.details.method && <div><strong>שיטה:</strong> {entry.details.method}</div>}
+                        <div><strong>סטטיסטיקות:</strong> {entry.details.gameStats.gamesPlayed} משחקים, {entry.details.gameStats.gamesWon} ניצחונות</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              {gameLog.length > 0 && (
+                <button 
+                  onClick={() => {
+                    addToGameLog('LOG_CLEARED', { method: 'manual_clear' });
+                    setGameLog([]);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors"
+                >
+                  נקה יומן
+                </button>
+              )}
+              <button onClick={() => setShowGameLog(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition-colors">סגור</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Completed Dialog */}
+      {showGameCompleted && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} p-6 rounded-lg text-center shadow-xl border-4 border-gold-500 max-w-xs`}>
+            <div className="text-6xl mb-3">🏆</div>
+            <p className={`${darkMode ? 'text-yellow-300' : 'text-yellow-600'} font-bold text-xl mb-2`}>משחק הושלם!</p>
+            <p className={`${darkMode ? 'text-yellow-400' : 'text-yellow-700'} text-sm mb-4`}>זהו דיאלוג סימולציה למשחק שהושלם במלואו!</p>
+            <div className="text-center">
+              <button onClick={() => {
+                addToGameLog('GAME_COMPLETED_ACKNOWLEDGED', { method: 'dialog_button' });
+                setShowGameCompleted(false);
+              }} className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-bold text-sm transition-colors">הבנתי</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Word Hint Dialog */}
+      {showWordHintDialog && selectedWordHint && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>רמז למילה</h2>
+              <button onClick={() => setShowWordHintDialog(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl mb-3">💡</div>
+              <div className={`text-2xl font-bold mb-3 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                {selectedWordHint.word}
+              </div>
+              <p className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} text-lg`}>
+                {selectedWordHint.hint}
+              </p>
+            </div>
+            <div className="mt-6 text-center">
+              <button onClick={() => setShowWordHintDialog(false)} className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-colors">הבנתי!</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Content Catalog Dialog */}
+      {showContentCatalog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-lg w-full mx-4 p-6 max-h-[85vh] overflow-hidden flex flex-col`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>קטלוג תוכן</h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={async () => {
+                    console.log('DEBUG: Refresh button clicked - checking for external catalog');
+                    try {
+                      setCatalogLoadError(null);
+                      
+                      // Try to load the external catalog using the same function as startup
+                      const catalogData = await loadContentCatalog();
+                      
+                      console.log('DEBUG: External catalog loaded and validated successfully');
+                      setContentCatalog(catalogData);
+                      setLoadedCatalogs(catalogData.catalogs);
+                      addToGameLog('CATALOG_REFRESHED', { 
+                        version: catalogData?.version || 'unknown',
+                        previousCatalog: currentCatalog,
+                        previousTheme: currentTheme 
+                      });
+                      
+                      // Reset game state to use the new content
+                      console.log('DEBUG: Resetting game state with new catalog content');
+                      
+                      // Clear current game state
+                      setGameWon(false);
+                      setGameLost(false);
+                      setShowWinAnimation(false);
+                      setGuesses([]);
+                      setCurrentGuess('');
+                      setShowHintDialog(false);
+                      setCategoryCompleted(false);
+                      setAllCategoriesCompleted(false);
+                      
+                      // Reset to first available theme in current catalog
+                      const newCatalogData = catalogData.catalogs[currentCatalog];
+                      if (newCatalogData && newCatalogData.themes) {
+                        const firstTheme = Object.keys(newCatalogData.themes)[0];
+                        if (firstTheme) {
+                          console.log(`DEBUG: Setting theme to ${firstTheme} and starting new game`);
+                          setCurrentTheme(firstTheme);
+                          
+                          // Force a complete game restart with new content
+                          setTimeout(() => {
+                            startNewGameForTheme(firstTheme);
+                          }, 100);
+                        }
+                      }
+                      
+                      console.log('DEBUG: Content catalog refresh completed successfully');
+                      
+                    } catch (error) {
+                      console.log('DEBUG: Expected behavior - external catalog not available:', error.message);
+                      
+                      // Only show errors for truly unexpected issues, not for missing external files
+                      if (!error.message.includes('HTTP error') && !error.message.includes('Response is not JSON')) {
+                        setCatalogLoadError(`שגיאה בטעינת קטלוג: ${error.message}`);
+                      }
+                      addToGameLog('CATALOG_REFRESH_SKIPPED', { 
+                        reason: 'external_catalog_not_available',
+                        error: error.message 
+                      });
+                    }
+                  }}
+                  className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                  title="רענן קטלוג"
+                >
+                  <RefreshCw size={16} />
+                </button>
+                <button onClick={() => setShowContentCatalog(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {catalogLoadError && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+                  <p className="text-red-800 text-sm font-bold">שגיאה בטעינת הקטלוג:</p>
+                  <p className="text-red-700 text-xs">{catalogLoadError}</p>
+                </div>
+              )}
+              
+              {Object.entries(catalogs).map(([catalogKey, catalog]) => {
+                const catalogName = catalog.name;
+                return (
+                  <div key={catalogKey} className={`mb-6 p-4 border rounded-lg ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                    <h3 className={`text-lg font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                      {catalogName} ({catalogKey})
+                    </h3>
+                    
+                    {/* Themes */}
+                    <div className="space-y-3">
+                      {Object.entries(catalog.themes).map(([themeKey, theme]) => {
+                        const usedKey = `${catalogKey}_${themeKey}`;
+                        const solvedKey = `${catalogKey}_${themeKey}`;
+                        const usedWordsInTheme = usedWords[usedKey] || [];
+                        const solvedWordsInTheme = solvedWords[solvedKey] || [];
+                        
+                        return (
+                          <div key={themeKey} className={`p-3 rounded border ${darkMode ? 'border-gray-500 bg-gray-600' : 'border-gray-300 bg-white'}`}>
+                            <h4 className={`font-bold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                              {theme.icon} {theme.name} ({theme.words.length} מילים)
+                            </h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-xs">
+                              {theme.words.map((word) => {
+                                const wasPlayed = usedWordsInTheme.includes(word);
+                                const wasSolved = solvedWordsInTheme.includes(word);
+                                
+                                return (
+                                  <div 
+                                    key={word}
+                                    onClick={() => handleWordClick(word, catalogKey, false)}
+                                    className={`p-1 rounded text-center font-bold cursor-pointer hover:opacity-80 transition-opacity ${
+                                      wasSolved 
+                                        ? 'bg-green-500 text-white' 
+                                        : wasPlayed 
+                                        ? 'bg-red-500 text-white'
+                                        : darkMode 
+                                        ? 'bg-gray-500 text-gray-200' 
+                                        : 'bg-gray-200 text-gray-700'
+                                    }`}
+                                  >
+                                    {word}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className={`mt-2 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              <span className="text-green-500 font-bold">{solvedWordsInTheme.length}</span> נוחשו | <span className="text-red-500 font-bold">{usedWordsInTheme.length - solvedWordsInTheme.length}</span> לא נוחשו | <span className={darkMode ? 'text-gray-400 font-bold' : 'text-gray-600 font-bold'}>{theme.words.length - usedWordsInTheme.length}</span> נותרו
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Daily Words */}
+                      <div className={`p-3 rounded border ${darkMode ? 'border-gray-500 bg-gray-600' : 'border-gray-300 bg-white'}`}>
+                        <h4 className={`font-bold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                          ⭐ מילים יומיומיות ({catalog.dailyWords.length} מילים)
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-xs">
+                          {catalog.dailyWords.map((word) => {
+                            const wasUsed = dailyWordsUsed.includes(word);
+                            const dailySolvedKey = `${catalogKey}_daily`;
+                            const wasSolved = (solvedWords[dailySolvedKey] || []).includes(word);
+                            
+                            return (
+                              <div 
+                                key={word}
+                                onClick={() => handleWordClick(word, catalogKey, true)}
+                                className={`p-1 rounded text-center font-bold cursor-pointer hover:opacity-80 transition-opacity ${
+                                  wasSolved 
+                                    ? 'bg-green-500 text-white' 
+                                    : wasUsed 
+                                    ? 'bg-red-500 text-white'
+                                    : darkMode 
+                                    ? 'bg-gray-500 text-gray-200' 
+                                    : 'bg-gray-200 text-gray-700'
+                                }`}
+                              >
+                                {word}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className={`mt-2 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                          {(() => {
+                            const dailySolvedKey = `${catalogKey}_daily`;
+                            const dailySolved = (solvedWords[dailySolvedKey] || []).length;
+                            // Fix: Use the correct dailyWordsUsed array for this specific catalog
+                            const catalogDailyWords = catalog.dailyWords;
+                            const dailyUsedForThisCatalog = dailyWordsUsed.filter(word => catalogDailyWords.includes(word));
+                            const dailyUsed = dailyUsedForThisCatalog.length;
+                            const dailyFailed = Math.max(0, dailyUsed - dailySolved);
+                            const dailyRemaining = Math.max(0, catalogDailyWords.length - dailyUsed);
+                            
+                            return (
+                              <>
+                                <span className="text-green-500 font-bold">{dailySolved}</span> נוחשו | <span className="text-red-500 font-bold">{dailyFailed}</span> לא נוחשו | <span className={darkMode ? 'text-gray-400 font-bold' : 'text-gray-600 font-bold'}>{dailyRemaining}</span> נותרו
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="mt-4 flex justify-center">
+              <button onClick={() => setShowContentCatalog(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition-colors">סגור</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Dialog */}
+      {showResetConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>אישור מחיקה</h2>
+              <button onClick={() => setShowResetConfirmDialog(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <p className={`${darkMode ? 'text-gray-200' : 'text-slate-700'} text-lg mb-4`}>
+                האם אתה בטוח שברצונך למחוק את כל ההישגים ולהתחיל מחדש?
+              </p>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-slate-500'} text-sm mb-6`}>
+                פעולה זו תמחק את כל הסטטיסטיקות, ההתקדמות והמילים שפתרת. לא ניתן לבטל פעולה זו.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button 
+                onClick={() => setShowResetConfirmDialog(false)}
+                className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors"
+              >
+                ביטול
+              </button>
+              <button 
+                onClick={() => {
+                  resetProgress();
+                  setShowStats(false);
+                  setShowResetConfirmDialog(false);
+                }}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors"
+              >
+                מחק הכל
+              </button>
             </div>
           </div>
         </div>
